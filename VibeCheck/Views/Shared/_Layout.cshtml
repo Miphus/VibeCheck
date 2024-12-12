@@ -1,0 +1,20 @@
+﻿<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>@ViewBag.Title</title>
+    <link rel="stylesheet" href="https://unpkg.com/@@picocss/pico@@latest/css/pico.classless.min.css">
+    <style>body {padding:20px;}</style>
+</head>
+<body>
+    <h4>Vibe Check</h4>
+    <div>
+        @RenderBody()
+    </div>
+    <footer>
+        Vibe Check
+    </footer>
+    @RenderSection("scripts", false)
+</body>
+</html>
