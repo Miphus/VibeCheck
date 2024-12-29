@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using VibeCheck.Models;
 using VibeCheck.Services;
 
@@ -9,7 +10,7 @@ namespace VibeCheck
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
@@ -26,43 +27,31 @@ namespace VibeCheck
             // Registrera Context-klassen för dependency injection
             builder.Services.AddDbContext<ApplicationContext>(o => o.UseSqlServer(connString));
 
-            // 1. Registera identity-klasserna och vilken DbContext som ska användas
+            // Registrera identity-klasserna
             builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             {
-                // Här kan vi (om vi vill) ange inställningar för t.ex. lösenord
-                // (ofta struntar man i detta och kör på default-värdena)
                 options.Password.RequiredLength = 6;
                 options.Password.RequireNonAlphanumeric = true;
             })
-                .AddEntityFrameworkStores<ApplicationContext>().AddDefaultTokenProviders();
+            .AddEntityFrameworkStores<ApplicationContext>()
+            .AddDefaultTokenProviders();
 
-            // 2. Specificera att auth cookies ska användas och URL till inloggnings-sidan
+            // Specifiera att auth cookies ska användas
             builder.Services.ConfigureApplicationCookie(o => o.LoginPath = "/login");
 
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-
-
-
             var app = builder.Build();
 
             var cultureInfo = new CultureInfo("en-US");
-
-            // Formatering av nummer och datum
             CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
-
-            // Vilket språk som ska användas
             CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 
             app.UseHttpsRedirection();
-
-            // 3. Kontrollera auth-cookien
             app.UseAuthorization();
             app.UseSwagger();
-            app.UseSwaggerUI(); // Nås på URL “/swagger”
-
-            // Applikationen måste instrueras att använda session
+            app.UseSwaggerUI();
             app.UseSession();
 
             if (!app.Environment.IsDevelopment())
@@ -71,13 +60,42 @@ namespace VibeCheck
                 app.UseStatusCodePagesWithRedirects("/error/http/{0}");
             }
 
-            // Stöd för Route-attribut på våra Action-metoder
-            app.MapControllers();
+            // Skapa standardroller vid applikationsstart
+            using (var scope = app.Services.CreateScope())
+            {
+                var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+                var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+                await CreateDefaultRolesAndAdminUser(roleManager, userManager);
+            }
 
-            // Stöd för statiska filer
             app.UseStaticFiles();
-
+            app.MapControllers();
             app.Run();
+        }
+
+        private static async Task CreateDefaultRolesAndAdminUser(RoleManager<IdentityRole> roleManager, UserManager<ApplicationUser> userManager)
+        {
+            // Skapa rollerna "Admin" och "User" om de inte redan finns
+            if (!await roleManager.RoleExistsAsync("Admin"))
+            {
+                await roleManager.CreateAsync(new IdentityRole("Admin"));
+            }
+            if (!await roleManager.RoleExistsAsync("User"))
+            {
+                await roleManager.CreateAsync(new IdentityRole("User"));
+            }
+
+            // Skapa en administratörsanvändare
+            var adminEmail = "admin@vibecheck.com";
+            var adminPassword = "Admin123!"; // Använd en säkrare lösenordshantering i produktion
+            var adminUser = await userManager.FindByEmailAsync(adminEmail);
+
+            if (adminUser == null)
+            {
+                adminUser = new ApplicationUser { UserName = adminEmail, Email = adminEmail };
+                await userManager.CreateAsync(adminUser, adminPassword);
+                await userManager.AddToRoleAsync(adminUser, "Admin");
+            }
         }
     }
 }

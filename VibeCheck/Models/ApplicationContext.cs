@@ -4,8 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace VibeCheck.Models
 {
-    public class ApplicationContext(DbContextOptions<ApplicationContext> options) :
-    IdentityDbContext<ApplicationUser, IdentityRole, string>(options)
+    public class ApplicationContext : IdentityDbContext<ApplicationUser, IdentityRole, string>
     {
+        public ApplicationContext(DbContextOptions<ApplicationContext> options) : base(options) { }
+
+        public DbSet<Artist> Artists { get; set; }
+        public DbSet<UserFavorite> UserFavorites { get; set; }
     }
 }
